@@ -161,6 +161,8 @@ public final class ExpenseTrackerViewModel {
 
     // MARK: - Monthly Photo Scan Orchestration
 
+    private var activeScanContext: ModelContext?
+
     public func startMonthlyScan(in modelContext: ModelContext) {
         guard !isScanning else { return }
 
@@ -170,6 +172,7 @@ public final class ExpenseTrackerViewModel {
         matchedNewSlipsCount = 0
         skippedDuplicatesCount = 0
         activeErrorMessage = nil
+        activeScanContext = modelContext
 
         let targetYear = selectedYear
         let targetMonth = selectedMonth
@@ -186,32 +189,37 @@ public final class ExpenseTrackerViewModel {
                     month: targetMonth,
                     deduplicationIndex: dedupIndex
                 ) { [weak self] progress in
-                    await MainActor.run {
-                        guard let self else { return }
-                        self.processedCount = progress.processedCount
-                        self.totalAssetsToScan = progress.totalAssets
-                        self.matchedNewSlipsCount = progress.matchedCount
-                        self.skippedDuplicatesCount = progress.skippedDuplicateCount
-
-                        if let candidate = progress.latestCandidate {
-                            self.categoryEngine.insertTransaction(from: candidate, in: modelContext)
-                            try? modelContext.save()
-                        }
-                    }
+                    await self?.handleScanProgress(progress)
                 }
                 self.isScanning = false
+                self.activeScanContext = nil
             } catch is CancellationError {
                 self.isScanning = false
+                self.activeScanContext = nil
             } catch {
                 self.isScanning = false
+                self.activeScanContext = nil
                 self.activeErrorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func handleScanProgress(_ progress: ScanProgressUpdate) {
+        processedCount = progress.processedCount
+        totalAssetsToScan = progress.totalAssets
+        matchedNewSlipsCount = progress.matchedCount
+        skippedDuplicatesCount = progress.skippedDuplicateCount
+
+        if let candidate = progress.latestCandidate, let context = activeScanContext {
+            categoryEngine.insertTransaction(from: candidate, in: context)
+            try? context.save()
         }
     }
 
     public func cancelScan() {
         scanTask?.cancel()
         scanTask = nil
+        activeScanContext = nil
         isScanning = false
     }
 
