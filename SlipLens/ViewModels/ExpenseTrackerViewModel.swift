@@ -323,7 +323,7 @@ public final class ExpenseTrackerViewModel {
         item.memo = memo?.trimmingCharacters(in: .whitespacesAndNewlines)
         item.reviewStatus = .verified
 
-        if saveAsPayeeRule && !item.isIncome {
+        if saveAsPayeeRule && item.documentType != .payslip {
             categoryEngine.savePayeeRule(
                 rawPayeeName: item.rawRecipientName,
                 customAlias: item.displayRecipientName,
@@ -334,5 +334,74 @@ public final class ExpenseTrackerViewModel {
         } else {
             try? modelContext.save()
         }
+    }
+
+    /// Manually adds an incoming money / salary / notification entry for the selected month.
+    public func addManualIncome(
+        title: String,
+        amount: Double,
+        memo: String?,
+        in modelContext: ModelContext
+    ) {
+        guard amount > 0 else { return }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Bangkok") ?? .current
+        let nowComps = calendar.dateComponents([.year, .month], from: .now)
+        let entryDate: Date = {
+            if nowComps.year == selectedYear && nowComps.month == selectedMonth {
+                return .now
+            }
+            return calendar.date(from: DateComponents(year: selectedYear, month: selectedMonth, day: 15, hour: 12)) ?? .now
+        }()
+
+        let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "เงินโอนเข้า / รายรับ"
+            : title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let item = TransactionItem(
+            assetLocalIdentifier: "MANUAL-\(UUID().uuidString)",
+            documentType: .payslip,
+            category: .salaryIncome,
+            reviewStatus: .verified,
+            amount: amount,
+            transactionDate: entryDate,
+            rawRecipientName: cleanedTitle,
+            displayRecipientName: cleanedTitle,
+            memo: memo,
+            grossIncome: amount,
+            taxAndDeductions: 0,
+            netPay: amount,
+            rawOCRText: "บันทึกรายรับ: \(cleanedTitle)",
+            confidenceScore: 1.0
+        )
+        modelContext.insert(item)
+        try? modelContext.save()
+    }
+
+    public var myAccountName: String {
+        UserDefaults.standard.string(forKey: CategoryEngine.myAccountNameDefaultsKey) ?? ""
+    }
+
+    /// Saves the user's own account name and automatically converts any scanned slip where the recipient
+    /// matches the user's own name into an incoming transfer (`salaryIncome`).
+    public func saveMyAccountNameAndReapply(_ name: String, in modelContext: ModelContext) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(trimmed, forKey: CategoryEngine.myAccountNameDefaultsKey)
+
+        guard !trimmed.isEmpty else { return }
+        let normalizedMyName = TransactionItem.normalizePayeeKey(trimmed)
+        guard normalizedMyName.count >= 2 else { return }
+
+        let allItems = (try? modelContext.fetch(FetchDescriptor<TransactionItem>())) ?? []
+        for item in allItems {
+            let recipientKey = TransactionItem.normalizePayeeKey(item.rawRecipientName)
+            if recipientKey.contains(normalizedMyName) || normalizedMyName.contains(recipientKey) {
+                item.category = .salaryIncome
+                if item.displayRecipientName == item.rawRecipientName {
+                    item.displayRecipientName = "เงินโอนเข้า (\(item.rawRecipientName))"
+                }
+            }
+        }
+        try? modelContext.save()
     }
 }

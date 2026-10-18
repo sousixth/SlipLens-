@@ -14,6 +14,9 @@ public struct DashboardView: View {
     @State private var selectedChartType: ChartStyle = .donut
     @State private var selectedTransactionForDetail: TransactionItem?
     @State private var pickedPhotoItems: [PhotosPickerItem] = []
+    @State private var showAddIncomeSheet: Bool = false
+    @State private var showMyAccountAlert: Bool = false
+    @State private var myAccountNameInput: String = ""
 
     public enum ChartStyle: String, CaseIterable, Identifiable {
         case donut = "Donut"
@@ -57,15 +60,20 @@ public struct DashboardView: View {
             .navigationTitle("SlipLens")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    PhotosPicker(
-                        selection: $pickedPhotoItems,
-                        maxSelectionCount: 20,
-                        matching: .images
-                    ) {
-                        Label("เลือกรูปสลิป", systemImage: "photo.badge.plus")
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        myAccountNameInput = viewModel.myAccountName
+                        showMyAccountAlert = true
+                    } label: {
+                        Label("ชื่อบัญชีฉัน", systemImage: "person.crop.circle.badge.checkmark")
                     }
-                    .disabled(viewModel.isScanning)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddIncomeSheet = true
+                    } label: {
+                        Label("เพิ่มรายรับ", systemImage: "plus.circle.fill")
+                    }
                 }
             }
             .onChange(of: pickedPhotoItems) { _, newItems in
@@ -86,6 +94,19 @@ public struct DashboardView: View {
                     transaction: transaction,
                     viewModel: viewModel
                 )
+            }
+            .sheet(isPresented: $showAddIncomeSheet) {
+                AddManualIncomeSheet(viewModel: viewModel)
+                    .presentationDetents([.medium])
+            }
+            .alert("ตั้งชื่อบัญชีของฉัน (แยกสลิปเงินเข้า)", isPresented: $showMyAccountAlert) {
+                TextField("เช่น ณัฐวุฒิ หรือ ชื่อจริงของคุณ", text: $myAccountNameInput)
+                Button("บันทึกและอัปเดตสลิป") {
+                    viewModel.saveMyAccountNameAndReapply(myAccountNameInput, in: modelContext)
+                }
+                Button("ยกเลิก", role: .cancel) {}
+            } message: {
+                Text("หากสลิปใบไหนมีชื่อผู้รับตรงกับชื่อของคุณ (เช่น คนอื่นโอนเงินให้คุณแล้วส่งสลิปมา) ระบบจะเปลี่ยนสลิปนั้นเป็น \"เงินเข้า (รายรับ)\" ให้อัตโนมัติ")
             }
             .alert(
                 "การสแกนคลังภาพ",
@@ -153,12 +174,33 @@ public struct DashboardView: View {
 
         return VStack(spacing: 12) {
             HStack(spacing: 12) {
-                metricCard(
-                    title: "รายรับ (เงินเดือน)",
-                    amount: income,
-                    icon: "arrow.down.left.circle.fill",
-                    tint: .green
-                )
+                Button {
+                    showAddIncomeSheet = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.left.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("รายรับ / เงินเข้า")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "plus.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                        Text(Self.formatTHB(income))
+                            .font(.headline.weight(.bold).monospacedDigit())
+                            .foregroundStyle(.primary)
+                            .minimumScaleFactor(0.75)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
 
                 metricCard(
                     title: "รายจ่าย (สลิป/บิล)",
@@ -250,8 +292,9 @@ public struct DashboardView: View {
     private var categoryChartSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("สัดส่วนค่าใช้จ่ายตามหมวดหมู่")
+                Text("สัดส่วนรายจ่าย")
                     .font(.headline)
+                    .lineLimit(1)
                 Spacer()
                 Picker("Chart Style", selection: $selectedChartType) {
                     ForEach(ChartStyle.allCases) { style in
@@ -419,25 +462,25 @@ public struct TransactionRowView: View {
                             .padding(.vertical, 2)
                             .background(Color.orange.opacity(0.2), in: Capsule())
                             .foregroundStyle(.orange)
+                            .fixedSize()
                     }
                 }
 
-                HStack(spacing: 6) {
-                    Label(item.category.localizedThaiName, systemImage: item.category.systemImage)
-                        .font(.caption)
+                HStack(spacing: 5) {
+                    Image(systemName: item.category.systemImage)
                         .foregroundStyle(item.category.tintColor)
-
+                    Text(item.category.localizedThaiName)
+                        .foregroundStyle(item.category.tintColor)
                     Text("•")
-                        .font(.caption)
                         .foregroundStyle(.secondary)
-
                     Text(item.transactionDate, format: .dateTime.day().month(.abbreviated).hour().minute())
-                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .font(.caption)
+                .lineLimit(1)
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
             VStack(alignment: .trailing, spacing: 4) {
                 Text(
@@ -445,13 +488,84 @@ public struct TransactionRowView: View {
                 )
                 .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(item.isIncome ? .green : .primary)
+                .lineLimit(1)
 
                 Text(item.documentType.shortName)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
+
+// MARK: - AddManualIncomeSheet
+
+private struct AddManualIncomeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @Bindable var viewModel: ExpenseTrackerViewModel
+
+    @State private var title: String = ""
+    @State private var amountString: String = ""
+    @State private var memo: String = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("บันทึกรายรับ / เงินโอนเข้า") {
+                    TextField("รายการ (เช่น เงินเดือน, ลูกค้าโอนเข้า)", text: $title)
+                    HStack {
+                        Text("จำนวนเงิน (฿)")
+                        Spacer()
+                        TextField("0.00", text: $amountString)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .font(.headline.monospacedDigit())
+                    }
+                    TextField("หมายเหตุเพิ่มเติม (ถ้ามี)", text: $memo)
+                }
+
+                Section {
+                    HStack(spacing: 8) {
+                        ForEach(["เงินเดือน", "โอนเงินเข้า", "ขายของ/ฟรีแลนซ์"], id: \.self) { preset in
+                            Button(preset) {
+                                title = preset
+                            }
+                            .font(.caption.weight(.medium))
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                } header: {
+                    Text("ตัวเลือกด่วน")
+                }
+            }
+            .navigationTitle("เพิ่มรายรับ / เงินเข้า")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("ยกเลิก") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("บันทึก") {
+                        let cleaned = amountString.replacingOccurrences(of: ",", with: "")
+                        if let amount = Double(cleaned), amount > 0 {
+                            viewModel.addManualIncome(
+                                title: title,
+                                amount: amount,
+                                memo: memo.isEmpty ? nil : memo,
+                                in: modelContext
+                            )
+                            dismiss()
+                        }
+                    }
+                    .fontWeight(.bold)
+                }
+            }
+        }
+    }
+}
+

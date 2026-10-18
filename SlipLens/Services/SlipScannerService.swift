@@ -116,6 +116,7 @@ public actor SlipScannerService {
 
     private static let slipKeywords: [String] = [
         "โอนเงินสำเร็จ", "รายการสำเร็จ", "ทำรายการสำเร็จ", "โอนเงิน",
+        "เงินเข้า", "รับโอนเงิน", "เงินเข้าบัญชี", "รายการเงินเข้า", "ยอดเงินเข้า",
         "รหัสอ้างอิง", "เลขที่รายการ", "เลขที่อ้างอิง", "ค่าธรรมเนียม",
         "บันทึกช่วยจำ", "พร้อมเพย์", "PROMPTPAY", "TRANSFER SUCCESSFUL",
         "TRANSACTION ID", "REF NO", "K PLUS", "SCB EASY", "KRUNGTHAI NEXT",
@@ -140,17 +141,17 @@ public actor SlipScannerService {
     ]
 
     private static let bankCodeMap: [String: String] = [
-        "002": "Bangkok Bank (BBL)",
-        "004": "Kasikornbank (KBank)",
-        "006": "Krungthai Bank (KTB)",
-        "011": "TMBThanachart (ttb)",
-        "014": "Siam Commercial Bank (SCB)",
-        "022": "CIMB Thai",
-        "024": "UOB Thailand",
-        "025": "Krungsri (BAY)",
-        "030": "Government Savings Bank (GSB)",
-        "034": "BAAC (ธ.ก.ส.)",
-        "069": "KKP (เกียรตินาคินภัทร)",
+        "002": "BBL",
+        "004": "KBank",
+        "006": "KTB",
+        "011": "ttb",
+        "014": "SCB",
+        "022": "CIMB",
+        "024": "UOB",
+        "025": "Krungsri",
+        "030": "GSB",
+        "034": "ธ.ก.ส.",
+        "069": "KKP",
         "073": "LH Bank"
     ]
 
@@ -476,7 +477,8 @@ public actor SlipScannerService {
         let suggestedCategory = guessCategory(
             recipient: recipient,
             memo: memo,
-            documentType: .transferSlip
+            documentType: .transferSlip,
+            fullText: fullText
         )
 
         return ScannedDocumentCandidate(
@@ -836,14 +838,14 @@ public actor SlipScannerService {
     private static func detectBankName(from fullText: String) -> String? {
         let upper = fullText.uppercased()
         let rules: [(keywords: [String], name: String)] = [
-            (["กสิกรไทย", "KASIKORNBANK", "K PLUS", "MAKE BY KBANK"], "Kasikornbank (KBank)"),
-            (["ไทยพาณิชย์", "SCB EASY", "SCB"], "Siam Commercial Bank (SCB)"),
-            (["กรุงไทย", "KRUNGTHAI", "KTB"], "Krungthai Bank (KTB)"),
-            (["กรุงเทพ", "BANGKOK BANK", "BUALUANG"], "Bangkok Bank (BBL)"),
-            (["กรุงศรี", "KRUNGSRI", "KMA"], "Krungsri (BAY)"),
-            (["ทหารไทยธนชาต", "TTB", "TTB TOUCH"], "TMBThanachart (ttb)"),
-            (["ออมสิน", "GSB", "MYMO"], "Government Savings Bank (GSB)"),
-            (["TRUEMONEY", "ทรูมันนี่"], "TrueMoney Wallet")
+            (["กสิกรไทย", "KASIKORNBANK", "K PLUS", "MAKE BY KBANK"], "KBank"),
+            (["ไทยพาณิชย์", "SCB EASY", "SCB"], "SCB"),
+            (["กรุงไทย", "KRUNGTHAI", "KTB"], "KTB"),
+            (["กรุงเทพ", "BANGKOK BANK", "BUALUANG"], "BBL"),
+            (["กรุงศรี", "KRUNGSRI", "KMA"], "Krungsri"),
+            (["ทหารไทยธนชาต", "TTB", "TTB TOUCH"], "ttb"),
+            (["ออมสิน", "GSB", "MYMO"], "GSB"),
+            (["TRUEMONEY", "ทรูมันนี่"], "TrueMoney")
         ]
         for rule in rules {
             if rule.keywords.contains(where: { upper.contains($0) }) {
@@ -1000,9 +1002,15 @@ public actor SlipScannerService {
     public static func guessCategory(
         recipient: String,
         memo: String?,
-        documentType: DocumentType
+        documentType: DocumentType,
+        fullText: String = ""
     ) -> ExpenseCategory {
         if documentType == .payslip {
+            return .salaryIncome
+        }
+        let upperFull = fullText.uppercased()
+        let incomingTokens = ["เงินเข้าบัญชี", "รายการเงินเข้า", "ยอดเงินเข้า", "รับโอนเงิน", "เงินเข้า +"]
+        if incomingTokens.contains(where: { upperFull.contains($0) }) {
             return .salaryIncome
         }
         let combined = "\(recipient) \(memo ?? "")".uppercased()

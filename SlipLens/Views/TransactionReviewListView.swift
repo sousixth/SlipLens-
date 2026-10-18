@@ -167,85 +167,119 @@ private struct ReviewQueueCard: View {
     let onSelectCategory: (ExpenseCategory) -> Void
     let onTapDetail: () -> Void
 
+    private var shortBankLabel: String {
+        guard let bank = item.bankName, !bank.isEmpty else {
+            return item.documentType.shortName
+        }
+        if bank.contains("SCB") { return "SCB" }
+        if bank.contains("KBank") { return "KBank" }
+        if bank.contains("KTB") { return "KTB" }
+        if bank.contains("BBL") { return "BBL" }
+        if bank.contains("ttb") { return "ttb" }
+        if bank.contains("BAY") || bank.contains("Krungsri") { return "Krungsri" }
+        if bank.contains("GSB") { return "GSB" }
+        return bank
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button(action: onTapDetail) {
-                HStack(spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
                     AssetThumbnailView(
                         localIdentifier: item.assetLocalIdentifier,
-                        targetSize: CGSize(width: 60, height: 60),
+                        targetSize: CGSize(width: 52, height: 52),
                         cornerRadius: 10
                     )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Label(item.documentType.shortName, systemImage: item.documentType.systemImage)
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.15), in: Capsule())
-
-                            if item.qrPayload != nil {
-                                Label("Mini-QR", systemImage: "qrcode")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.blue)
-                            }
-                        }
-
                         Text(item.displayRecipientName)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
 
-                        Text(item.transactionDate, format: .dateTime.day().month(.abbreviated).year().hour().minute())
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            Text(item.transactionDate, format: .dateTime.day().month(.abbreviated).hour().minute())
+                            Text("•")
+                            Text(shortBankLabel)
+                                .fontWeight(.medium)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                     }
-
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
 
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text(DashboardView.formatTHB(item.amount))
-                            .font(.headline.weight(.bold).monospacedDigit())
+                        Text((item.isIncome ? "+" : "") + DashboardView.formatTHB(item.amount))
+                            .font(.subheadline.weight(.bold).monospacedDigit())
                             .foregroundStyle(item.isIncome ? .green : .primary)
+                            .lineLimit(1)
 
-                        if let bank = item.bankName {
-                            Text(bank)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                        HStack(spacing: 4) {
+                            if item.qrPayload != nil {
+                                Image(systemName: "qrcode")
+                                    .foregroundStyle(.blue)
+                            }
+                            Text(item.isIncome ? "รายรับ" : item.category.localizedThaiName)
+                                .foregroundStyle(item.category.tintColor)
                         }
+                        .font(.caption2.weight(.medium))
+                        .lineLimit(1)
                     }
+                    .fixedSize(horizontal: true, vertical: false)
                 }
             }
             .buttonStyle(.plain)
 
-            // Quick Category Pills
-            if !item.isIncome {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(ExpenseCategory.expenseCategories) { category in
-                            let isSelected = item.category == category
-                            Button {
-                                onSelectCategory(category)
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: category.systemImage)
-                                    Text(category.localizedThaiName)
-                                }
-                                .font(.caption.weight(isSelected ? .bold : .regular))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(
-                                    isSelected
-                                        ? category.tintColor.opacity(0.22)
-                                        : Color.secondary.opacity(0.1),
-                                    in: Capsule()
-                                )
-                                .foregroundStyle(isSelected ? category.tintColor : .primary)
-                            }
-                            .buttonStyle(.plain)
+            // Quick Category Pills (including 1-tap "เงินเข้า/รายรับ" pill first!)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    // 1-Tap Incoming Money / Income Pill
+                    let isIncomeSelected = item.category == .salaryIncome
+                    Button {
+                        onSelectCategory(.salaryIncome)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.left.circle.fill")
+                            Text("เงินเข้า/รายรับ")
                         }
+                        .font(.caption.weight(isIncomeSelected ? .bold : .medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            isIncomeSelected
+                                ? Color.green.opacity(0.25)
+                                : Color.green.opacity(0.12),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(.green)
+                        .fixedSize()
+                    }
+                    .buttonStyle(.plain)
+
+                    ForEach(ExpenseCategory.expenseCategories) { category in
+                        let isSelected = item.category == category
+                        Button {
+                            onSelectCategory(category)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: category.systemImage)
+                                Text(category.localizedThaiName)
+                            }
+                            .font(.caption.weight(isSelected ? .bold : .regular))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                isSelected
+                                    ? category.tintColor.opacity(0.22)
+                                    : Color.secondary.opacity(0.12),
+                                in: Capsule()
+                            )
+                            .foregroundStyle(isSelected ? category.tintColor : .primary)
+                            .fixedSize()
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -253,3 +287,4 @@ private struct ReviewQueueCard: View {
         .padding(.vertical, 4)
     }
 }
+

@@ -21,11 +21,12 @@ public struct PayeeResolutionResult: Sendable {
 public final class CategoryEngine {
 
     public static let shared = CategoryEngine()
+    public static let myAccountNameDefaultsKey = "SlipLens.myAccountName"
 
     public init() {}
 
-    /// Resolves a candidate's raw recipient name against saved `PayeeMappingRule` records in SwiftData.
-    /// Falls back to the heuristic category suggested by `SlipScannerService` if no rule matches.
+    /// Resolves a candidate's raw recipient name against saved `PayeeMappingRule` records in SwiftData
+    /// and the user's own account name (for incoming transfers).
     public func resolvePayee(
         rawRecipientName: String,
         fallbackCategory: ExpenseCategory,
@@ -43,6 +44,19 @@ public final class CategoryEngine {
         let normalizedKey = TransactionItem.normalizePayeeKey(rawRecipientName)
         guard !normalizedKey.isEmpty else {
             return PayeeResolutionResult(displayAlias: rawRecipientName, category: fallbackCategory)
+        }
+
+        // Check if recipient matches user's own account name -> Incoming transfer (เงินโอนเข้า)
+        if let myName = UserDefaults.standard.string(forKey: Self.myAccountNameDefaultsKey),
+           !myName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let normalizedMyName = TransactionItem.normalizePayeeKey(myName)
+            if normalizedMyName.count >= 2 && (normalizedKey.contains(normalizedMyName) || normalizedMyName.contains(normalizedKey)) {
+                return PayeeResolutionResult(
+                    displayAlias: "เงินโอนเข้า (\(rawRecipientName))",
+                    category: .salaryIncome,
+                    matchedRuleID: nil
+                )
+            }
         }
 
         let descriptor = FetchDescriptor<PayeeMappingRule>()
@@ -163,7 +177,7 @@ public final class CategoryEngine {
             let allTransactions = (try? modelContext.fetch(txDescriptor)) ?? []
             var matchCounter = 0
 
-            for tx in allTransactions where !tx.isIncome {
+            for tx in allTransactions where tx.documentType != .payslip {
                 let txKey = TransactionItem.normalizePayeeKey(tx.rawRecipientName)
                 if txKey == normalizedKey {
                     tx.displayRecipientName = cleanedAlias
