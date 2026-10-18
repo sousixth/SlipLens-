@@ -223,6 +223,70 @@ public final class ExpenseTrackerViewModel {
         isScanning = false
     }
 
+    /// Scans manually selected photos from `PhotosPicker` without requiring full library month iteration.
+    public func scanManualImageDataList(_ imageDatas: [Data], in modelContext: ModelContext) {
+        guard !imageDatas.isEmpty, !isScanning else { return }
+
+        isScanning = true
+        processedCount = 0
+        totalAssetsToScan = imageDatas.count
+        matchedNewSlipsCount = 0
+        skippedDuplicatesCount = 0
+        activeErrorMessage = nil
+        activeScanContext = modelContext
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Bangkok") ?? .current
+        let fallbackDate = calendar.date(from: DateComponents(year: selectedYear, month: selectedMonth, day: 15, hour: 12)) ?? .now
+
+        let existingItems = (try? modelContext.fetch(FetchDescriptor<TransactionItem>())) ?? []
+        var dedupIndex = DeduplicationIndex(existingItems: existingItems)
+
+        scanTask = Task { [weak self] in
+            guard let self else { return }
+            var currentMatched = 0
+            var currentSkipped = 0
+
+            for (idx, data) in imageDatas.enumerated() {
+                if Task.isCancelled { break }
+                let step = idx + 1
+                guard let uiImage = UIImage(data: data),
+                      let cgImage = uiImage.cgImage else {
+                    self.processedCount = step
+                    continue
+                }
+
+                let syntheticID = "PICKED-\(UUID().uuidString)"
+                do {
+                    let candidate = try await SlipScannerService.shared.scanImage(
+                        cgImage: cgImage,
+                        assetLocalIdentifier: syntheticID,
+                        fallbackDate: fallbackDate
+                    )
+                    if dedupIndex.contains(candidate) {
+                        currentSkipped += 1
+                    } else {
+                        dedupIndex.insert(candidate)
+                        currentMatched += 1
+                        if let context = self.activeScanContext {
+                            self.categoryEngine.insertTransaction(from: candidate, in: context)
+                            try? context.save()
+                        }
+                    }
+                } catch {
+                    // Continue with remaining picked images
+                }
+
+                self.processedCount = step
+                self.matchedNewSlipsCount = currentMatched
+                self.skippedDuplicatesCount = currentSkipped
+            }
+
+            self.isScanning = false
+            self.activeScanContext = nil
+        }
+    }
+
     // MARK: - Review Queue & Categorization Mutations
 
     public func verifyTransaction(_ item: TransactionItem, in modelContext: ModelContext) {

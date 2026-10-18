@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Charts
+import PhotosUI
 
 // MARK: - DashboardView
 
@@ -12,6 +13,7 @@ public struct DashboardView: View {
     @Bindable var viewModel: ExpenseTrackerViewModel
     @State private var selectedChartType: ChartStyle = .donut
     @State private var selectedTransactionForDetail: TransactionItem?
+    @State private var pickedPhotoItems: [PhotosPickerItem] = []
 
     public enum ChartStyle: String, CaseIterable, Identifiable {
         case donut = "Donut"
@@ -34,7 +36,7 @@ public struct DashboardView: View {
     public var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 18) {
                     monthSelectorHeader
 
                     if viewModel.isScanning {
@@ -53,15 +55,30 @@ public struct DashboardView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("SlipLens")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.startMonthlyScan(in: modelContext)
-                    } label: {
-                        Label("สแกนเดือนนี้", systemImage: "viewfinder.circle.fill")
-                            .fontWeight(.semibold)
+                    PhotosPicker(
+                        selection: $pickedPhotoItems,
+                        maxSelectionCount: 20,
+                        matching: .images
+                    ) {
+                        Label("เลือกรูปสลิป", systemImage: "photo.badge.plus")
                     }
                     .disabled(viewModel.isScanning)
+                }
+            }
+            .onChange(of: pickedPhotoItems) { _, newItems in
+                guard !newItems.isEmpty else { return }
+                Task {
+                    var loadedDatas: [Data] = []
+                    for item in newItems {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            loadedDatas.append(data)
+                        }
+                    }
+                    pickedPhotoItems.removeAll()
+                    viewModel.scanManualImageDataList(loadedDatas, in: modelContext)
                 }
             }
             .sheet(item: $selectedTransactionForDetail) { transaction in
@@ -137,44 +154,66 @@ public struct DashboardView: View {
         return VStack(spacing: 12) {
             HStack(spacing: 12) {
                 metricCard(
-                    title: "รายรับ (Payslips)",
+                    title: "รายรับ (เงินเดือน)",
                     amount: income,
                     icon: "arrow.down.left.circle.fill",
                     tint: .green
                 )
 
                 metricCard(
-                    title: "รายจ่าย (Slips/Bills)",
+                    title: "รายจ่าย (สลิป/บิล)",
                     amount: expense,
                     icon: "arrow.up.right.circle.fill",
                     tint: .red
                 )
             }
 
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("คงเหลือสุทธิ (Net Balance)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(Self.formatTHB(net, showSign: true))
-                        .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(net >= 0 ? Color.primary : Color.red)
-                }
-                Spacer()
-                Button {
-                    viewModel.startMonthlyScan(in: modelContext)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles.rectangle.stack.fill")
-                        Text(viewModel.isScanning ? "กำลังสแกน..." : "สแกนสลิปในอัลบั้ม")
+            VStack(spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("คงเหลือสุทธิ (Net Balance)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(Self.formatTHB(net, showSign: true))
+                            .font(.title2.weight(.bold).monospacedDigit())
+                            .foregroundStyle(net >= 0 ? Color.primary : Color.red)
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.accentColor, in: Capsule())
-                    .foregroundStyle(.white)
+                    Spacer()
                 }
-                .disabled(viewModel.isScanning)
+
+                HStack(spacing: 10) {
+                    Button {
+                        viewModel.startMonthlyScan(in: modelContext)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles.rectangle.stack.fill")
+                            Text(viewModel.isScanning ? "กำลังสแกน..." : "สแกนอัลบั้มทั้งเดือน")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(.white)
+                    }
+                    .disabled(viewModel.isScanning)
+
+                    PhotosPicker(
+                        selection: $pickedPhotoItems,
+                        maxSelectionCount: 20,
+                        matching: .images
+                    ) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo.on.rectangle.angled")
+                            Text("เลือกรูปเอง")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(Color.accentColor)
+                    }
+                    .disabled(viewModel.isScanning)
+                }
             }
             .padding(16)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))

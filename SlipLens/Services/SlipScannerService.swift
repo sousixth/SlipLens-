@@ -458,7 +458,7 @@ public actor SlipScannerService {
         }
 
         // 2. Date & Time
-        let transactionDate = extractThaiDateTime(from: fullText) ?? fallbackDate
+        let transactionDate = resolveTransactionDate(from: fullText, fallbackDate: fallbackDate)
 
         // 3. Transaction Reference ID
         let refID = miniQR?.transactionRefID ?? extractReferenceID(from: lineStrings, fullText: fullText)
@@ -513,7 +513,7 @@ public actor SlipScannerService {
             throw SlipScannerError.unparseableAmount
         }
 
-        let transactionDate = extractThaiDateTime(from: fullText) ?? fallbackDate
+        let transactionDate = resolveTransactionDate(from: fullText, fallbackDate: fallbackDate)
         let merchantName = extractMerchantName(from: lineStrings)
         let refID = extractReferenceID(from: lineStrings, fullText: fullText)
         let suggestedCategory = guessCategory(
@@ -574,7 +574,7 @@ public actor SlipScannerService {
             throw SlipScannerError.unparseableAmount
         }
 
-        let transactionDate = extractThaiDateTime(from: fullText) ?? fallbackDate
+        let transactionDate = resolveTransactionDate(from: fullText, fallbackDate: fallbackDate)
         let employerName = extractEmployerName(from: lineStrings)
 
         return ScannedDocumentCandidate(
@@ -592,6 +592,17 @@ public actor SlipScannerService {
             qrPayload: nil,
             confidenceScore: confidence
         )
+    }
+
+    private static func resolveTransactionDate(from text: String, fallbackDate: Date) -> Date {
+        guard let extracted = extractThaiDateTime(from: text) else {
+            return fallbackDate
+        }
+        // Keep extracted date only if it falls in the same month/year as the photo's creationDate
+        if TransactionItem.makeMonthYearKey(for: extracted) == TransactionItem.makeMonthYearKey(for: fallbackDate) {
+            return extracted
+        }
+        return fallbackDate
     }
 
     // MARK: - Regex & Field Extraction Helpers

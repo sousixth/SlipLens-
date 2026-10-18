@@ -82,7 +82,7 @@ public struct TransactionReviewListView: View {
                     .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("รอตรวจสอบ (Review)")
+            .navigationTitle("รอตรวจสอบ")
             .toolbar {
                 if !pendingItems.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {

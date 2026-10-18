@@ -42,18 +42,18 @@ public struct MainTabContainerView: View {
         TabView {
             DashboardView(viewModel: viewModel)
                 .tabItem {
-                    Label("ภาพรวม (Dashboard)", systemImage: "chart.pie.fill")
+                    Label("ภาพรวม", systemImage: "chart.pie.fill")
                 }
 
             TransactionReviewListView(viewModel: viewModel)
                 .tabItem {
-                    Label("รอตรวจสอบ (Review)", systemImage: "checklist")
+                    Label("รอตรวจสอบ", systemImage: "checklist")
                 }
                 .badge(pendingBadgeCount)
 
             PayeeRulesListView()
                 .tabItem {
-                    Label("กฎผู้รับ (Rules)", systemImage: "wand.and.stars")
+                    Label("กฎผู้รับ", systemImage: "wand.and.stars")
                 }
         }
     }

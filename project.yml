@@ -21,6 +21,29 @@ targets:
           - Info.plist
     info:
       path: SlipLens/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: th
+        CFBundleDisplayName: SlipLens
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "2"
+        LSRequiresIPhoneOS: true
+        NSPhotoLibraryUsageDescription: "SlipLens ต้องการเข้าถึงคลังรูปภาพของคุณเพื่อสแกนสลิปโอนเงิน ใบเสร็จ และสลิปเงินเดือนประจำเดือน โดยประมวลผลบนอุปกรณ์ 100%"
+        NSPhotoLibraryAddUsageDescription: "SlipLens ต้องการสิทธิ์ในการเข้าถึงรูปภาพเพื่อจัดการสลิปของคุณ"
+        NSCameraUsageDescription: "SlipLens ต้องการใช้กล้องเพื่อสแกนสลิปโอนเงินและใบเสร็จ"
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen:
+          UIColorName: ""
+          UIImageName: ""
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sliplens.tracker

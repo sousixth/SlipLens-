@@ -42,6 +42,7 @@ jobs:
 
       - name: Package Payload & Ad-Hoc Sign into SlipLens-Unsigned.ipa
         run: |
+          plutil -p build/Build/Products/Release-iphoneos/SlipLens.app/Info.plist
           mkdir -p Payload
           cp -r build/Build/Products/Release-iphoneos/SlipLens.app Payload/
           codesign --force --deep --sign - Payload/SlipLens.app

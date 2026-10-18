@@ -314,7 +314,7 @@ public struct PayeeRulesListView: View {
                     }
                 }
             }
-            .navigationTitle("กฎผู้รับเงิน (Payee Rules)")
+            .navigationTitle("กฎผู้รับเงิน")
         }
     }
 }
