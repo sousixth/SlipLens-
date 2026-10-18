@@ -40,10 +40,11 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Package Payload into SlipLens-Unsigned.ipa
+      - name: Package Payload & Ad-Hoc Sign into SlipLens-Unsigned.ipa
         run: |
           mkdir -p Payload
           cp -r build/Build/Products/Release-iphoneos/SlipLens.app Payload/
+          codesign --force --deep --sign - Payload/SlipLens.app
           zip -r9 SlipLens-Unsigned.ipa Payload
 
       - name: Upload SlipLens-Unsigned.ipa Artifact

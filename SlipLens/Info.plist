@@ -18,10 +18,18 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0.0</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>iPhoneOS</string>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>MinimumOSVersion</key>
+	<string>$(IPHONEOS_DEPLOYMENT_TARGET)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>SlipLens ต้องการสิทธิ์ในการเข้าถึงรูปภาพเพื่อจัดการสลิปของคุณ</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SlipLens ต้องการเข้าถึงคลังรูปภาพของคุณเพื่อสแกนสลิปโอนเงิน ใบเสร็จ และสลิปเงินเดือนประจำเดือน โดยประมวลผลบนอุปกรณ์ 100% (ไม่อัปโหลดรูปขึ้นเซิร์ฟเวอร์)</string>
 	<key>UIApplicationSceneManifest</key>
@@ -29,8 +37,17 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+		<integer>2</integer>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
